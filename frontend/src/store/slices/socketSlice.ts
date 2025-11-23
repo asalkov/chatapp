@@ -5,11 +5,13 @@ import type { Socket } from 'socket.io-client';
 interface SocketState {
   socket: Socket | null;
   isConnected: boolean;
+  isRegistered: boolean;
 }
 
 const initialState: SocketState = {
   socket: null,
   isConnected: false,
+  isRegistered: false,
 };
 
 const socketSlice = createSlice({
@@ -25,12 +27,16 @@ const socketSlice = createSlice({
     setConnected: (state, action: PayloadAction<boolean>) => {
       state.isConnected = action.payload;
     },
+    setRegistered: (state, action: PayloadAction<boolean>) => {
+      state.isRegistered = action.payload;
+    },
     clearSocket: (state) => {
       state.socket = null;
       state.isConnected = false;
+      state.isRegistered = false;
     },
   },
 });
 
-export const { setSocket, setConnected, clearSocket } = socketSlice.actions;
+export const { setSocket, setConnected, setRegistered, clearSocket } = socketSlice.actions;
 export default socketSlice.reducer;

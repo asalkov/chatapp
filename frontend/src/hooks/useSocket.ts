@@ -4,12 +4,12 @@ import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { setLoginError, logout } from '../store/slices/authSlice';
 import { addMessage, incrementUnread, initializeChat, loadPersistedChats } from '../store/slices/chatSlice';
 import { setConnectedUsers, removeUserCompletely } from '../store/slices/usersSlice';
-import { setSocket, clearSocket } from '../store/slices/socketSlice';
+import { setSocket, clearSocket, setRegistered } from '../store/slices/socketSlice';
 import type { Message } from '../store/slices/chatSlice';
 import type { User } from '../components/UserList';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 
-  (window.location.hostname === 'localhost' ? 'http://localhost:3000' : window.location.origin);
+  (window.location.hostname === 'localhost' ? 'http://localhost:3000' : `${window.location.protocol}//${window.location.hostname}:3000`);
 
 export const useSocket = () => {
   const dispatch = useAppDispatch();
@@ -37,6 +37,7 @@ export const useSocket = () => {
       newSocket.emit('register', { username }, (response: { success: boolean; message?: string }) => {
         if (response.success) {
           console.log('✅ Registration successful');
+          dispatch(setRegistered(true));
         } else {
           console.error('❌ Registration failed:', response.message);
           dispatch(setLoginError(response.message || 'Registration failed'));

@@ -1,4 +1,5 @@
-const API_URL = 'http://localhost:3000';
+const API_URL = import.meta.env.VITE_BACKEND_URL || 
+  (window.location.hostname === 'localhost' ? 'http://localhost:3000' : `${window.location.protocol}//${window.location.hostname}:3000`);
 
 export interface RegisterData {
   username: string;
@@ -39,12 +40,6 @@ export const authService = {
         throw new Error(result.message || 'Registration failed');
       }
 
-      // Store token in localStorage
-      if (result.access_token) {
-        localStorage.setItem('auth_token', result.access_token);
-        localStorage.setItem('user', JSON.stringify(result.user));
-      }
-
       return result;
     } catch (error) {
       console.error('Registration error:', error);
@@ -68,12 +63,6 @@ export const authService = {
         throw new Error(result.message || 'Login failed');
       }
 
-      // Store token in localStorage
-      if (result.access_token) {
-        localStorage.setItem('auth_token', result.access_token);
-        localStorage.setItem('user', JSON.stringify(result.user));
-      }
-
       return result;
     } catch (error) {
       console.error('Login error:', error);
@@ -82,42 +71,6 @@ export const authService = {
   },
 
   logout() {
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('user');
-  },
-
-  getToken(): string | null {
-    return localStorage.getItem('auth_token');
-  },
-
-  getUser(): { id: string; username: string; email: string } | null {
-    const userStr = localStorage.getItem('user');
-    if (!userStr) return null;
-    try {
-      return JSON.parse(userStr);
-    } catch {
-      return null;
-    }
-  },
-
-  isAuthenticated(): boolean {
-    return !!this.getToken();
-  },
-
-  async validateToken(): Promise<boolean> {
-    const token = this.getToken();
-    if (!token) return false;
-
-    try {
-      const response = await fetch(`${API_URL}/auth/validate`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      return response.ok;
-    } catch {
-      return false;
-    }
+    // No localStorage cleanup needed
   },
 };

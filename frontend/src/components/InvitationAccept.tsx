@@ -15,6 +15,9 @@ import {
   PersonAdd as InviteIcon,
 } from '@mui/icons-material';
 
+const API_URL = import.meta.env.VITE_BACKEND_URL || 
+  (window.location.hostname === 'localhost' ? 'http://localhost:3000' : `${window.location.protocol}//${window.location.hostname}:3000`);
+
 interface InvitationData {
   id: string;
   inviterUsername: string;
@@ -43,7 +46,7 @@ export default function InvitationAccept() {
   const fetchInvitation = async () => {
     try {
       const response = await fetch(
-        `http://localhost:3000/invitations/token/${token}`,
+        `${API_URL}/invitations/token/${token}`,
       );
       const data = await response.json();
 
@@ -72,7 +75,7 @@ export default function InvitationAccept() {
 
     try {
       const response = await fetch(
-        `http://localhost:3000/invitations/accept/${token}`,
+        `${API_URL}/invitations/accept/${token}`,
         {
           method: 'POST',
         },
@@ -101,7 +104,7 @@ export default function InvitationAccept() {
 
     try {
       const response = await fetch(
-        `http://localhost:3000/invitations/reject/${token}`,
+        `${API_URL}/invitations/reject/${token}`,
         {
           method: 'POST',
         },

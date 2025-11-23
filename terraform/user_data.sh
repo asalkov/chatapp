@@ -1,10 +1,13 @@
 #!/bin/bash
 # Cloud‑init script for the chat app EC2 instance
 
-# Install Docker, Docker‑Compose, AWS CLI, Nginx, and Certbot
-sudo dnf install -y docker docker-compose-plugin aws-cli nginx certbot python3-certbot-nginx
+# Install Docker, AWS CLI, Nginx, and Certbot
+sudo dnf install -y docker aws-cli nginx certbot python3-certbot-nginx
 sudo systemctl enable --now docker
 
+# Install Docker Compose standalone binary
+sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+sudo chmod +x /usr/local/bin/docker-compose
 
 # Wait for Docker to be ready
 sleep 5
@@ -19,6 +22,7 @@ docker pull 270163127745.dkr.ecr.us-east-1.amazonaws.com/chatapp-frontend:latest
 
 # Change to the app directory (files are copied via Terraform file provisioners)
 mkdir -p /home/ec2-user/app
+sudo chown -R ec2-user:ec2-user /home/ec2-user/app
 cd /home/ec2-user/app
 
 # Create the docker-compose.yml file
@@ -44,7 +48,7 @@ services:
 EOF
 
 # Bring the stack up with Docker Compose (uses the ECR images)
-docker compose up -d
+docker-compose up -d
 
 # Generate self-signed SSL certificate
 sudo mkdir -p /etc/nginx/ssl
@@ -54,7 +58,7 @@ sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
     -subj "/C=US/ST=State/L=City/O=Organization/CN=chatapp"
 
 # Configure Nginx as reverse proxy with SSL
-cat > /etc/nginx/conf.d/chatapp.conf <<'EOF'
+sudo tee /etc/nginx/conf.d/chatapp.conf > /dev/null <<'EOF'
 # HTTP server - redirect to HTTPS
 server {
     listen 80;
@@ -107,4 +111,4 @@ EOF
 
 sudo systemctl enable --now nginx
 
-echo "$(date) – Chat app started" >> /var/log/chatapp-startup.log
+sudo bash -c 'echo "$(date) – Chat app started" >> /var/log/chatapp-startup.log'

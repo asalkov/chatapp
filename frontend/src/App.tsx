@@ -24,11 +24,15 @@ import {
   ExitToApp as LogoutIcon,
   Person as PersonIcon,
   Group as GroupIcon,
+  PersonAdd as InviteIcon,
+  List as ListIcon,
 } from '@mui/icons-material';
 import Login from './components/Login';
 import SystemMessage from './components/SystemMessage';
 import ChatList from './components/ChatList';
 import AdminPanel from './components/AdminPanel';
+import InviteFriend from './components/InviteFriend';
+import InvitationsList from './components/InvitationsList';
 import { Chat as ChatIcon } from '@mui/icons-material';
 import { isAdmin as checkIsAdmin } from './config/admin';
 
@@ -49,6 +53,8 @@ function App() {
   
   // Local state for message input
   const [message, setMessage] = useState('');
+  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
+  const [invitationsListOpen, setInvitationsListOpen] = useState(false);
   const messagesEndRef = useRef<null | HTMLDivElement>(null);
 
   // Helper to get current messages for display
@@ -87,6 +93,23 @@ function App() {
     }
   }, [isLoggedIn, isAdmin, socket, dispatch]);
 
+  // Listen for invitation acceptance notifications
+  useEffect(() => {
+    if (socket && isLoggedIn) {
+      const handleInvitationAccepted = (data: { inviteeEmail: string; timestamp: string }) => {
+        console.log('🎉 Invitation accepted:', data);
+        // You could show a notification here
+        alert(`${data.inviteeEmail} accepted your invitation!`);
+      };
+
+      socket.on('invitationAccepted', handleInvitationAccepted);
+
+      return () => {
+        socket.off('invitationAccepted', handleInvitationAccepted);
+      };
+    }
+  }, [socket, isLoggedIn]);
+
   const handleLogin = (name: string) => {
     dispatch(login(name));
     dispatch(clearLoginError());
@@ -111,10 +134,15 @@ function App() {
     saveLastUsername(name);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     if (socket) {
       socket.close();
     }
+    
+    // Clear auth token
+    const { authService } = await import('./services/authService');
+    authService.logout();
+    
     dispatch(logoutAction());
     dispatch(clearAllChats());
     dispatch(clearSocket());
@@ -353,16 +381,6 @@ function App() {
               <GroupIcon />
             </IconButton>
 
-            <Avatar
-              sx={{
-                mr: 2,
-                width: 40,
-                height: 40,
-                background: `linear-gradient(135deg, #667eea 0%, #764ba2 100%)`,
-              }}
-            >
-              {username[0].toUpperCase()}
-            </Avatar>
             <Box sx={{ flexGrow: 1 }}>
               <Typography variant="h6" sx={{ fontWeight: 600 }}>
                 Welcome, {username}!
@@ -378,6 +396,20 @@ function App() {
               )}
             </Box>
 
+            <IconButton
+              onClick={() => setInvitationsListOpen(true)}
+              color="inherit"
+              title="View Invitations"
+            >
+              <ListIcon />
+            </IconButton>
+            <IconButton
+              onClick={() => setInviteDialogOpen(true)}
+              color="inherit"
+              title="Invite Friend"
+            >
+              <InviteIcon />
+            </IconButton>
             <IconButton onClick={handleLogout} color="inherit">
               <LogoutIcon />
             </IconButton>
@@ -482,6 +514,16 @@ function App() {
           </Box>
         )}
       </Box>
+
+      {/* Invitation Dialogs */}
+      <InviteFriend
+        open={inviteDialogOpen}
+        onClose={() => setInviteDialogOpen(false)}
+      />
+      <InvitationsList
+        open={invitationsListOpen}
+        onClose={() => setInvitationsListOpen(false)}
+      />
     </Box>
   );
 }

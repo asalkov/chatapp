@@ -11,6 +11,7 @@ import {
 import { Logger, Injectable } from '@nestjs/common';
 import { Socket, Server } from 'socket.io';
 import { MessageService } from './database/message.service';
+import { InvitationService } from './database/invitation.service';
 
 interface UserData {
   username: string;
@@ -30,7 +31,10 @@ export class AppGateway
   private logger: Logger = new Logger('AppGateway');
   private users: Map<string, UserData> = new Map(); // socketId -> userData
 
-  constructor(private readonly messageService: MessageService) {}
+  constructor(
+    private readonly messageService: MessageService,
+    private readonly invitationService: InvitationService,
+  ) {}
 
   @SubscribeMessage('register')
   handleRegister(
@@ -229,14 +233,14 @@ export class AppGateway
 
     // Find the user to remove
     const userEntry = Array.from(this.users.entries()).find(
-      ([_, userData]) => userData.username === usernameToRemove,
+      ([, userData]) => userData.username === usernameToRemove,
     );
 
     if (!userEntry) {
       return { success: false, message: 'User not found' };
     }
 
-    const [socketId, userData] = userEntry;
+    const [socketId] = userEntry;
 
     // Remove user from the map
     this.users.delete(socketId);
@@ -326,5 +330,97 @@ export class AppGateway
 
   handleConnection(client: Socket) {
     this.logger.log(`Client connected: ${client.id}`);
+  }
+
+  @SubscribeMessage('sendInvitation')
+  handleSendInvitation(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { inviterUsername: string; inviteeEmail: string },
+  ): { success: boolean; invitation?: any; message?: string } {
+    const sender = this.users.get(client.id);
+
+    if (!sender) {
+      return { success: false, message: 'Not registered' };
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(data.inviteeEmail)) {
+      return { success: false, message: 'Invalid email format' };
+    }
+
+    const invitation = this.invitationService.createInvitation(
+      data.inviterUsername,
+      data.inviteeEmail,
+    );
+
+    const invitationLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/invite/${invitation.token}`;
+
+    this.logger.log(
+      `Invitation sent: ${data.inviterUsername} -> ${data.inviteeEmail}`,
+    );
+
+    return {
+      success: true,
+      invitation: {
+        id: invitation.id,
+        inviterUsername: invitation.inviterUsername,
+        inviteeEmail: invitation.inviteeEmail,
+        status: invitation.status,
+        createdAt: invitation.createdAt,
+        expiresAt: invitation.expiresAt,
+        invitationLink,
+      },
+      message: 'Invitation sent successfully',
+    };
+  }
+
+  @SubscribeMessage('getMyInvitations')
+  handleGetMyInvitations(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { username: string },
+  ): { success: boolean; invitations?: any[]; message?: string } {
+    const user = this.users.get(client.id);
+
+    if (!user) {
+      return { success: false, message: 'Not registered' };
+    }
+
+    const invitations = this.invitationService.getInvitationsByUser(
+      data.username,
+    );
+
+    return {
+      success: true,
+      invitations: invitations.map((inv) => ({
+        id: inv.id,
+        inviterUsername: inv.inviterUsername,
+        inviteeEmail: inv.inviteeEmail,
+        status: inv.status,
+        createdAt: inv.createdAt,
+        expiresAt: inv.expiresAt,
+        acceptedAt: inv.acceptedAt,
+      })),
+    };
+  }
+
+  // Notify a user when someone accepts their invitation
+  notifyInvitationAccepted(inviterUsername: string, inviteeEmail: string) {
+    // Find the inviter's socket
+    const inviterEntry = Array.from(this.users.entries()).find(
+      ([_, userData]) => userData.username === inviterUsername,
+    );
+
+    if (inviterEntry) {
+      const [socketId] = inviterEntry;
+      this.server.to(socketId).emit('invitationAccepted', {
+        inviteeEmail,
+        timestamp: new Date().toISOString(),
+      });
+
+      this.logger.log(
+        `Notified ${inviterUsername} that ${inviteeEmail} accepted invitation`,
+      );
+    }
   }
 }

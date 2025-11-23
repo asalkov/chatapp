@@ -14,11 +14,15 @@ import {
     Toolbar,
     Alert,
     Collapse,
+    Tabs,
+    Tab,
 } from '@mui/material';
 import {
     Chat as ChatIcon,
     Person as PersonIcon,
     ErrorOutline as ErrorIcon,
+    Email as EmailIcon,
+    Lock as LockIcon,
 } from '@mui/icons-material';
 
 interface LoginProps {
@@ -27,12 +31,81 @@ interface LoginProps {
 }
 
 export default function Login({ onLogin, error }: LoginProps) {
+    const [mode, setMode] = useState<'login' | 'register'>('login');
     const [username, setUsername] = useState('');
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [localError, setLocalError] = useState('');
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (username.trim()) {
-            onLogin(username.trim());
+        setLocalError('');
+
+        if (!username.trim()) {
+            setLocalError('Username is required');
+            return;
+        }
+
+        if (mode === 'register') {
+            if (!email.trim()) {
+                setLocalError('Email is required');
+                return;
+            }
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) {
+                setLocalError('Please enter a valid email address');
+                return;
+            }
+            if (!password) {
+                setLocalError('Password is required');
+                return;
+            }
+            if (password.length < 6) {
+                setLocalError('Password must be at least 6 characters');
+                return;
+            }
+            if (password !== confirmPassword) {
+                setLocalError('Passwords do not match');
+                return;
+            }
+
+            // Call register endpoint
+            try {
+                const { authService } = await import('../services/authService');
+                const result = await authService.register({
+                    username: username.trim(),
+                    email: email.trim(),
+                    password,
+                });
+
+                if (result.success && result.user) {
+                    onLogin(result.user.username);
+                }
+            } catch (error: any) {
+                setLocalError(error.message || 'Registration failed');
+            }
+        } else {
+            // Login mode
+            if (!password) {
+                setLocalError('Password is required');
+                return;
+            }
+
+            // Call login endpoint
+            try {
+                const { authService } = await import('../services/authService');
+                const result = await authService.login({
+                    username: username.trim(),
+                    password,
+                });
+
+                if (result.success && result.user) {
+                    onLogin(result.user.username);
+                }
+            } catch (error: any) {
+                setLocalError(error.message || 'Login failed');
+            }
         }
     };
 
@@ -139,7 +212,7 @@ export default function Login({ onLogin, error }: LoginProps) {
                                     mb: 1,
                                 }}
                             >
-                                Welcome Back
+                                {mode === 'login' ? 'Welcome Back' : 'Create Account'}
                             </Typography>
                             <Typography
                                 variant="body1"
@@ -149,12 +222,54 @@ export default function Login({ onLogin, error }: LoginProps) {
                                     fontSize: { xs: '0.9rem', sm: '1rem' },
                                 }}
                             >
-                                Enter your name to join the conversation
+                                {mode === 'login' 
+                                    ? 'Sign in to continue chatting' 
+                                    : 'Register to start your journey'}
                             </Typography>
                         </Box>
 
+                        <Tabs
+                            value={mode}
+                            onChange={(_, newValue) => {
+                                setMode(newValue);
+                                setLocalError('');
+                            }}
+                            sx={{
+                                mb: 3,
+                                '& .MuiTabs-indicator': {
+                                    backgroundColor: '#667eea',
+                                },
+                            }}
+                            centered
+                        >
+                            <Tab 
+                                label="Login" 
+                                value="login"
+                                sx={{
+                                    textTransform: 'none',
+                                    fontSize: '1rem',
+                                    fontWeight: 600,
+                                    '&.Mui-selected': {
+                                        color: '#667eea',
+                                    },
+                                }}
+                            />
+                            <Tab 
+                                label="Register" 
+                                value="register"
+                                sx={{
+                                    textTransform: 'none',
+                                    fontSize: '1rem',
+                                    fontWeight: 600,
+                                    '&.Mui-selected': {
+                                        color: '#667eea',
+                                    },
+                                }}
+                            />
+                        </Tabs>
+
                         <Box component="form" onSubmit={handleSubmit}>
-                            <Collapse in={!!error}>
+                            <Collapse in={!!(error || localError)}>
                                 <Alert
                                     severity="error"
                                     icon={<ErrorIcon fontSize="inherit" />}
@@ -170,9 +285,10 @@ export default function Login({ onLogin, error }: LoginProps) {
                                         alignItems: 'center',
                                     }}
                                 >
-                                    {error}
+                                    {error || localError}
                                 </Alert>
                             </Collapse>
+
                             <TextField
                                 fullWidth
                                 label="Username"
@@ -189,7 +305,7 @@ export default function Login({ onLogin, error }: LoginProps) {
                                     ),
                                 }}
                                 sx={{
-                                    mb: 3,
+                                    mb: 2,
                                     '& .MuiOutlinedInput-root': {
                                         borderRadius: 2,
                                         '&:hover fieldset': {
@@ -201,6 +317,128 @@ export default function Login({ onLogin, error }: LoginProps) {
                                     },
                                 }}
                             />
+
+                            {mode === 'register' && (
+                                <>
+                                    <TextField
+                                        fullWidth
+                                        label="Email"
+                                        type="email"
+                                        variant="outlined"
+                                        value={email}
+                                        onChange={(e) => setEmail(e.target.value)}
+                                        required
+                                        InputProps={{
+                                            startAdornment: (
+                                                <InputAdornment position="start">
+                                                    <EmailIcon color="action" />
+                                                </InputAdornment>
+                                            ),
+                                        }}
+                                        sx={{
+                                            mb: 2,
+                                            '& .MuiOutlinedInput-root': {
+                                                borderRadius: 2,
+                                                '&:hover fieldset': {
+                                                    borderColor: '#667eea',
+                                                },
+                                                '&.Mui-focused fieldset': {
+                                                    borderColor: '#667eea',
+                                                },
+                                            },
+                                        }}
+                                    />
+
+                                    <TextField
+                                        fullWidth
+                                        label="Password"
+                                        type="password"
+                                        variant="outlined"
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        required
+                                        InputProps={{
+                                            startAdornment: (
+                                                <InputAdornment position="start">
+                                                    <LockIcon color="action" />
+                                                </InputAdornment>
+                                            ),
+                                        }}
+                                        sx={{
+                                            mb: 2,
+                                            '& .MuiOutlinedInput-root': {
+                                                borderRadius: 2,
+                                                '&:hover fieldset': {
+                                                    borderColor: '#667eea',
+                                                },
+                                                '&.Mui-focused fieldset': {
+                                                    borderColor: '#667eea',
+                                                },
+                                            },
+                                        }}
+                                    />
+
+                                    <TextField
+                                        fullWidth
+                                        label="Confirm Password"
+                                        type="password"
+                                        variant="outlined"
+                                        value={confirmPassword}
+                                        onChange={(e) => setConfirmPassword(e.target.value)}
+                                        required
+                                        InputProps={{
+                                            startAdornment: (
+                                                <InputAdornment position="start">
+                                                    <LockIcon color="action" />
+                                                </InputAdornment>
+                                            ),
+                                        }}
+                                        sx={{
+                                            mb: 2,
+                                            '& .MuiOutlinedInput-root': {
+                                                borderRadius: 2,
+                                                '&:hover fieldset': {
+                                                    borderColor: '#667eea',
+                                                },
+                                                '&.Mui-focused fieldset': {
+                                                    borderColor: '#667eea',
+                                                },
+                                            },
+                                        }}
+                                    />
+                                </>
+                            )}
+
+                            {mode === 'login' && (
+                                <TextField
+                                    fullWidth
+                                    label="Password"
+                                    type="password"
+                                    variant="outlined"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    required
+                                    InputProps={{
+                                        startAdornment: (
+                                            <InputAdornment position="start">
+                                                <LockIcon color="action" />
+                                            </InputAdornment>
+                                        ),
+                                    }}
+                                    sx={{
+                                        mb: 3,
+                                        '& .MuiOutlinedInput-root': {
+                                            borderRadius: 2,
+                                            '&:hover fieldset': {
+                                                borderColor: '#667eea',
+                                            },
+                                            '&.Mui-focused fieldset': {
+                                                borderColor: '#667eea',
+                                            },
+                                        },
+                                    }}
+                                />
+                            )}
 
                             <Button
                                 type="submit"
@@ -231,7 +469,7 @@ export default function Login({ onLogin, error }: LoginProps) {
                                     },
                                 }}
                             >
-                                Join Chat
+                                {mode === 'login' ? 'Sign In' : 'Create Account'}
                             </Button>
 
                             <Typography

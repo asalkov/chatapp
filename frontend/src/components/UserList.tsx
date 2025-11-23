@@ -10,6 +10,7 @@ import {
     IconButton,
     Divider,
     Badge,
+    ListItemButton,
 } from '@mui/material';
 import {
     Close as CloseIcon,
@@ -17,14 +18,21 @@ import {
     Group as GroupIcon,
 } from '@mui/icons-material';
 
+export interface User {
+    username: string;
+    id: string;
+    isOnline?: boolean;
+}
+
 interface UserListProps {
     open: boolean;
     onClose: () => void;
-    users: string[];
+    users: User[];
     currentUser: string;
+    onSelectUser: (user: User) => void;
 }
 
-export default function UserList({ open, onClose, users, currentUser }: UserListProps) {
+export default function UserList({ open, onClose, users, currentUser, onSelectUser }: UserListProps) {
     return (
         <Drawer
             anchor="right"
@@ -72,56 +80,66 @@ export default function UserList({ open, onClose, users, currentUser }: UserList
 
             <List sx={{ p: 0 }}>
                 {users.map((user) => {
-                    const isMe = user === currentUser;
+                    const isMe = user.username === currentUser;
                     return (
                         <ListItem
-                            key={user}
+                            key={user.id}
+                            disablePadding
                             sx={{
-                                py: 1.5,
-                                px: 2,
                                 background: isMe ? 'rgba(102, 126, 234, 0.05)' : 'transparent',
                             }}
                         >
-                            <ListItemAvatar>
-                                <Avatar
-                                    sx={{
-                                        background: isMe
-                                            ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-                                            : '#e0e0e0',
-                                        color: isMe ? '#fff' : '#757575',
-                                    }}
-                                >
-                                    <PersonIcon />
-                                </Avatar>
-                            </ListItemAvatar>
-                            <ListItemText
-                                primary={
-                                    <Typography
-                                        variant="subtitle1"
+                            <ListItemButton
+                                onClick={() => {
+                                    if (!isMe) {
+                                        onSelectUser(user);
+                                        onClose();
+                                    }
+                                }}
+                                disabled={isMe}
+                                sx={{ py: 1.5, px: 2 }}
+                            >
+                                <ListItemAvatar>
+                                    <Avatar
                                         sx={{
-                                            fontWeight: isMe ? 600 : 400,
-                                            color: isMe ? '#667eea' : '#000',
+                                            background: isMe
+                                                ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                                                : '#e0e0e0',
+                                            color: isMe ? '#fff' : '#757575',
                                         }}
                                     >
-                                        {user} {isMe && '(You)'}
-                                    </Typography>
-                                }
-                                secondary={
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                        <Box
+                                        <PersonIcon />
+                                    </Avatar>
+                                </ListItemAvatar>
+                                <ListItemText
+                                    primary={
+                                        <Typography
+                                            variant="subtitle1"
                                             sx={{
-                                                width: 8,
-                                                height: 8,
-                                                borderRadius: '50%',
-                                                background: '#4caf50',
+                                                fontWeight: isMe ? 600 : 400,
+                                                color: isMe ? '#667eea' : '#000',
                                             }}
-                                        />
-                                        <Typography variant="caption" color="text.secondary">
-                                            Online
+                                        >
+                                            {user.username} {isMe && '(You)'}
                                         </Typography>
-                                    </Box>
-                                }
-                            />
+                                    }
+                                    secondary={
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                            <Box
+                                                sx={{
+                                                    width: 8,
+                                                    height: 8,
+                                                    borderRadius: '50%',
+                                                    background: '#4caf50',
+                                                }}
+                                            />
+                                            <Typography variant="caption" color="text.secondary">
+                                                Online
+                                            </Typography>
+                                        </Box>
+                                    }
+                                />
+                            </ListItemButton>
                         </ListItem>
                     );
                 })}

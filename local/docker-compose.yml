@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    image: chatapp-backend:local
+    container_name: chatapp-backend-local
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - NODE_ENV=development
+    restart: unless-stopped
+    networks:
+      - chatapp-network
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_BACKEND_URL=http://localhost:3000
+    image: chatapp-frontend:local
+    container_name: chatapp-frontend-local
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - chatapp-network
+
+networks:
+  chatapp-network:
+    driver: bridge

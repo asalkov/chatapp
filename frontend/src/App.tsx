@@ -24,13 +24,15 @@ import {
 import { io, Socket } from 'socket.io-client';
 import Login from './components/Login';
 import UserList from './components/UserList';
+import SystemMessage from './components/SystemMessage';
 
 // Use environment variable or default to localhost
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || (window.location.hostname === 'localhost' ? 'http://localhost:3000' : window.location.origin);
 
 interface Message {
   sender: string;
   message: string;
+  type?: 'user' | 'system';
 }
 
 function App() {
@@ -81,6 +83,30 @@ function App() {
       newSocket.on('userList', (users: string[]) => {
         console.log('👥 Connected users updated:', users);
         setConnectedUsers(users);
+      });
+
+      newSocket.on('userJoined', (data: { username: string }) => {
+        console.log('👤 User joined:', data.username);
+        setMessages((prev) => [
+          ...prev,
+          {
+            sender: 'System',
+            message: `${data.username} joined the chat`,
+            type: 'system',
+          },
+        ]);
+      });
+
+      newSocket.on('userLeft', (data: { username: string }) => {
+        console.log('👤 User left:', data.username);
+        setMessages((prev) => [
+          ...prev,
+          {
+            sender: 'System',
+            message: `${data.username} left the chat`,
+            type: 'system',
+          },
+        ]);
       });
 
       newSocket.on('msgToClient', (payload: Message) => {
@@ -300,6 +326,9 @@ function App() {
             }}
           >
             {messages.map((msg, index) => {
+              if (msg.type === 'system') {
+                return <SystemMessage key={index} message={msg.message} />;
+              }
               const isOwnMessage = msg.sender === username;
               return (
                 <Fade in key={index} timeout={300}>

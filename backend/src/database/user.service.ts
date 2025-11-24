@@ -45,7 +45,9 @@ export class UserService implements OnModuleInit {
         email: adminEmail,
         password: adminPassword,
       });
-      this.logger.log('Default admin user created (username: admin, password: admin)');
+      this.logger.log(
+        'Default admin user created (username: admin, password: admin)',
+      );
     } catch (error) {
       this.logger.error('Failed to create admin user', error);
     }

@@ -122,25 +122,26 @@ function ChatPage() {
         const targetUser = allUsers.find(u => u.username === activeChat);
         
         if (targetUser) {
-          // Create message object
-          const messageObj = {
-            sender: username,
-            message: msgContent,
-            timestamp: new Date().toISOString(),
-            isPrivate: true,
-            recipient: activeChat,
-          };
-
-          // Add message to local state immediately
+          // Initialize chat if needed
           dispatch(initializeChat(activeChat));
-          dispatch(addMessage({ chatId: activeChat, message: messageObj }));
 
           // If user is online, send via socket
+          // The backend will echo the message back, which will be added to state
           if (targetUser.isOnline && targetUser.id) {
             console.log(`📤 Sending private message to ${targetUser.username} (${targetUser.id}) - ONLINE`);
             socket.emit('privateMessage', { to: targetUser.id, message: msgContent });
           } else {
+            // For offline users, add message to local state only
+            // (backend will handle delivery when they come online)
             console.log(`📤 Message saved for ${targetUser.username} - OFFLINE (will be delivered when online)`);
+            const messageObj = {
+              sender: username,
+              message: msgContent,
+              timestamp: new Date().toISOString(),
+              isPrivate: true,
+              recipient: activeChat,
+            };
+            dispatch(addMessage({ chatId: activeChat, message: messageObj }));
           }
           
           setMessage('');

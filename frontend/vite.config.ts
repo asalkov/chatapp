@@ -7,4 +7,6 @@ export default defineConfig({
   server: {
     host: true,
   },
+  // Explicitly set appType to 'spa' for client-side routing support
+  appType: 'spa',
 })

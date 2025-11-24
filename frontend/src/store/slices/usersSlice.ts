@@ -20,14 +20,20 @@ const usersSlice = createSlice({
       // Mark incoming users as online
       const onlineUsers = action.payload.map(u => ({ ...u, isOnline: true }));
       
-      // Get usernames of online users
-      const onlineUsernames = new Set(onlineUsers.map(u => u.username));
+      // Create a map of online users by username for quick lookup
+      const onlineUsersMap = new Map(onlineUsers.map(u => [u.username, u]));
       
-      // Mark existing users as offline if they're not in the online list
-      const updatedAllUsers = state.allUsers.map(u => ({
-        ...u,
-        isOnline: onlineUsernames.has(u.username)
-      }));
+      // Update existing users: update socket ID if online, mark offline if not
+      const updatedAllUsers = state.allUsers.map(u => {
+        const onlineUser = onlineUsersMap.get(u.username);
+        if (onlineUser) {
+          // User is online - update with fresh socket ID and mark online
+          return { ...onlineUser, isOnline: true };
+        } else {
+          // User is offline - keep old data but mark offline
+          return { ...u, isOnline: false };
+        }
+      });
       
       // Add new users that we haven't seen before
       onlineUsers.forEach(onlineUser => {

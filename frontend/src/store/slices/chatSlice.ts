@@ -35,7 +35,19 @@ const chatSlice = createSlice({
       if (!state.chats[chatId]) {
         state.chats[chatId] = [];
       }
-      state.chats[chatId].push(message);
+      
+      // Check for duplicates before adding (based on timestamp, sender, and message content)
+      const isDuplicate = state.chats[chatId].some(existingMsg => 
+        existingMsg.timestamp === message.timestamp && 
+        existingMsg.message === message.message &&
+        existingMsg.sender === message.sender
+      );
+      
+      if (!isDuplicate) {
+        state.chats[chatId].push(message);
+      } else {
+        console.warn('⚠️ Duplicate message detected and prevented:', message);
+      }
     },
     setActiveChat: (state, action: PayloadAction<string | null>) => {
       state.activeChat = action.payload;

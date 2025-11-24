@@ -26,7 +26,7 @@ import {
 } from '@mui/icons-material';
 
 interface LoginProps {
-    onLogin: (username: string) => void;
+    onLogin: (username: string, email: string, password: string, isRegistering: boolean, token: string) => void;
     error?: string;
 }
 
@@ -70,21 +70,8 @@ export default function Login({ onLogin, error }: LoginProps) {
                 return;
             }
 
-            // Call register endpoint
-            try {
-                const { authService } = await import('../services/authService');
-                const result = await authService.register({
-                    username: username.trim(),
-                    email: email.trim(),
-                    password,
-                });
-
-                if (result.success && result.user) {
-                    onLogin(result.user.username);
-                }
-            } catch (error: any) {
-                setLocalError(error.message || 'Registration failed');
-            }
+            // Pass data to parent for WebSocket registration
+            onLogin(username.trim(), email.trim(), password, true, 'temp-token');
         } else {
             // Login mode
             if (!password) {
@@ -92,20 +79,8 @@ export default function Login({ onLogin, error }: LoginProps) {
                 return;
             }
 
-            // Call login endpoint
-            try {
-                const { authService } = await import('../services/authService');
-                const result = await authService.login({
-                    username: username.trim(),
-                    password,
-                });
-
-                if (result.success && result.user) {
-                    onLogin(result.user.username);
-                }
-            } catch (error: any) {
-                setLocalError(error.message || 'Login failed');
-            }
+            // Pass data to parent for WebSocket login
+            onLogin(username.trim(), '', password, false, 'temp-token');
         }
     };
 

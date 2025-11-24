@@ -40,7 +40,8 @@ export class MessageService {
   // Get all messages for a user
   getMessagesForUser(username: string): StoredMessage[] {
     const messages = this.messages.get(username) || [];
-    this.logger.log(`Retrieved ${messages.length} messages for ${username}`);
+    const messagePreview = messages.map(m => `${m.sender}->${m.recipient}: "${m.message}"`).join(', ');
+    this.logger.log(`Retrieved ${messages.length} messages for ${username}: [${messagePreview}]`);
     return messages;
   }
 

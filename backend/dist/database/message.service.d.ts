@@ -16,6 +16,7 @@ export declare class MessageService {
     markAsRead(username: string, messageIds: string[]): void;
     deleteUserMessages(username: string): void;
     deleteConversation(user1: string, user2: string): void;
+    getAllMessages(): Map<string, StoredMessage[]>;
     getStats(): {
         totalMessages: number;
         totalUsers: number;

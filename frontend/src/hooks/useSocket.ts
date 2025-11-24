@@ -8,12 +8,26 @@ import { setSocket, clearSocket, setRegistered } from '../store/slices/socketSli
 import type { Message } from '../store/slices/chatSlice';
 import type { User } from '../components/UserList';
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 
-  (window.location.hostname === 'localhost' ? 'http://localhost:3000' : `${window.location.protocol}//${window.location.hostname}:3000`);
+// Construct backend URL with fallback logic
+const getBackendUrl = () => {
+  if (import.meta.env.VITE_BACKEND_URL) {
+    return import.meta.env.VITE_BACKEND_URL;
+  }
+  
+  // Default to localhost for development
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    return 'http://localhost:3000';
+  }
+  
+  // For production, use same host with port 3000
+  return `${window.location.protocol}//${window.location.hostname}:3000`;
+};
+
+const BACKEND_URL = getBackendUrl();
 
 export const useSocket = () => {
   const dispatch = useAppDispatch();
-  const { username, isLoggedIn } = useAppSelector(state => state.auth);
+  const { username, email, password, isLoggedIn, isRegistering } = useAppSelector(state => state.auth);
   const { activeChat } = useAppSelector(state => state.chat);
   const { connectedUsers } = useAppSelector(state => state.users);
   
@@ -34,17 +48,43 @@ export const useSocket = () => {
       console.log('✅ Connected to server');
       console.log('Socket ID:', newSocket.id);
       
-      newSocket.emit('register', { username }, (response: { success: boolean; message?: string }) => {
-        if (response.success) {
-          console.log('✅ Registration successful');
-          dispatch(setRegistered(true));
-        } else {
-          console.error('❌ Registration failed:', response.message);
-          dispatch(setLoginError(response.message || 'Registration failed'));
-          dispatch(logout());
-          newSocket.close();
-        }
-      });
+      if (isRegistering) {
+        // Register new user
+        console.log('📝 Registering new user:', username);
+        newSocket.emit(
+          'registerUser',
+          { username, email, password },
+          (response: { success: boolean; message?: string }) => {
+            if (response.success) {
+              console.log('✅ Registration successful');
+              dispatch(setRegistered(true));
+            } else {
+              console.error('❌ Registration failed:', response.message);
+              dispatch(setLoginError(response.message || 'Registration failed'));
+              dispatch(logout());
+              newSocket.close();
+            }
+          }
+        );
+      } else {
+        // Login existing user
+        console.log('🔐 Logging in user:', username);
+        newSocket.emit(
+          'loginUser',
+          { username, password },
+          (response: { success: boolean; message?: string }) => {
+            if (response.success) {
+              console.log('✅ Login successful');
+              dispatch(setRegistered(true));
+            } else {
+              console.error('❌ Login failed:', response.message);
+              dispatch(setLoginError(response.message || 'Login failed'));
+              dispatch(logout());
+              newSocket.close();
+            }
+          }
+        );
+      }
     });
 
     newSocket.on('userList', (users: User[]) => {
@@ -54,6 +94,11 @@ export const useSocket = () => {
 
     newSocket.on('persistedMessages', (data: { conversations: Record<string, any[]>; totalMessages: number }) => {
       console.log(`📦 Received ${data.totalMessages} persisted messages from backend`);
+      
+      // Log detailed message content for debugging
+      Object.entries(data.conversations).forEach(([partner, messages]) => {
+        console.log(`💬 Conversation with ${partner}:`, messages);
+      });
       
       // Convert conversations to the format expected by Redux
       const chats: Record<string, any[]> = {};
@@ -119,10 +164,22 @@ export const useSocket = () => {
 
     newSocket.on('error', (error: { message: string }) => {
       console.error('❌ Socket error:', error.message);
+      
+      // Handle forced logout scenarios
+      if (error.message.includes('logged in from another location')) {
+        alert('You have been logged in from another location');
+        dispatch(logout());
+        newSocket.close();
+      }
     });
 
-    newSocket.on('disconnect', () => {
-      console.log('❌ Disconnected from server');
+    newSocket.on('disconnect', (reason: string) => {
+      console.log('❌ Disconnected from server. Reason:', reason);
+      
+      // If disconnected by server (not by client), mark as not registered
+      if (reason === 'io server disconnect' || reason === 'transport close') {
+        dispatch(setRegistered(false));
+      }
     });
 
     // Expose socket for debugging

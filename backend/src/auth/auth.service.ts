@@ -69,7 +69,7 @@ export class AuthService {
     const { username, password } = loginDto;
 
     // Find user
-    const user = await this.userService.findByUsername(username);
+    const user = this.userService.findByUsername(username);
 
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
@@ -86,7 +86,7 @@ export class AuthService {
     }
 
     // Update last login
-    await this.userService.updateLastLogin(user.id);
+    this.userService.updateLastLogin(user.id);
 
     this.logger.log(`User logged in: ${username}`);
 

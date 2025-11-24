@@ -27,7 +27,8 @@ let MessageService = class MessageService {
     }
     getMessagesForUser(username) {
         const messages = this.messages.get(username) || [];
-        this.logger.log(`Retrieved ${messages.length} messages for ${username}`);
+        const messagePreview = messages.map(m => `${m.sender}->${m.recipient}: "${m.message}"`).join(', ');
+        this.logger.log(`Retrieved ${messages.length} messages for ${username}: [${messagePreview}]`);
         return messages;
     }
     getConversation(user1, user2) {
@@ -63,6 +64,9 @@ let MessageService = class MessageService {
             (msg.sender === user2 && msg.recipient === user1)));
         this.messages.set(user2, filtered2);
         this.logger.log(`Deleted conversation between ${user1} and ${user2}`);
+    }
+    getAllMessages() {
+        return new Map(this.messages);
     }
     getStats() {
         let totalMessages = 0;

@@ -3,6 +3,7 @@
 const STORAGE_KEYS = {
   USERS: 'chatapp_users',
   LAST_USERNAME: 'chatapp_last_username',
+  ACCESS_TOKEN: 'chatapp_access_token',
 } as const;
 
 export interface StoredUser {
@@ -79,7 +80,27 @@ export const clearAllStorage = () => {
   try {
     localStorage.removeItem(STORAGE_KEYS.USERS);
     localStorage.removeItem(STORAGE_KEYS.LAST_USERNAME);
+    localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
   } catch (error) {
     console.error('Error clearing all storage:', error);
+  }
+};
+
+// Save access token
+export const saveAccessToken = (token: string) => {
+  try {
+    localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, token);
+  } catch (error) {
+    console.error('Error saving access token:', error);
+  }
+};
+
+// Get access token
+export const getAccessToken = (): string | null => {
+  try {
+    return localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+  } catch (error) {
+    console.error('Error getting access token:', error);
+    return null;
   }
 };

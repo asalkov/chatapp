@@ -15,8 +15,22 @@ import {
   PersonAdd as InviteIcon,
 } from '@mui/icons-material';
 
-const API_URL = import.meta.env.VITE_BACKEND_URL || 
-  (window.location.hostname === 'localhost' ? 'http://localhost:3000' : `${window.location.protocol}//${window.location.hostname}:3000`);
+// Construct backend URL with fallback logic
+const getApiUrl = () => {
+  if (import.meta.env.VITE_BACKEND_URL) {
+    return import.meta.env.VITE_BACKEND_URL;
+  }
+  
+  // Default to localhost for development
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    return 'http://localhost:3000';
+  }
+  
+  // For production, use same host with port 3000
+  return `${window.location.protocol}//${window.location.hostname}:3000`;
+};
+
+const API_URL = getApiUrl();
 
 interface InvitationData {
   id: string;

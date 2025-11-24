@@ -1,12 +1,16 @@
-# WebSocket Registration Race Condition Fix
+# WebSocket Registration Fixes
 
-## Problem
+## Problem 1: Race Condition (FIXED)
 Admin panel was trying to fetch all chats immediately after socket connection, but before WebSocket registration completed, causing "Not authenticated" errors.
+
+## Problem 2: Duplicate Session (NEW FIX)
+When a user logs in from a new location or auto-login triggers, the backend was rejecting the connection with "Username already taken" because the old session wasn't properly disconnected.
 
 ## Error Messages
 ```
 ❌ Failed to fetch all chats: Not authenticated
 ❌ Registration failed: Username already taken
+❌ Disconnected from server
 ```
 
 ## Root Cause
@@ -66,10 +70,65 @@ useEffect(() => {
 }, [isLoggedIn, isAdmin, socket, isSocketRegistered]);
 ```
 
+## Solution for Problem 2: Duplicate Session Handling
+
+### Backend: Disconnect Old Session When New One Connects
+**File**: `backend/src/app.gateway.ts`
+
+When a user tries to register with a username that's already connected:
+1. Check if it's the same socket (reconnection) - allow it
+2. If it's a different socket (new location) - disconnect the old session and allow the new one
+
+```typescript
+// Check if username is already taken by another connection
+const existingEntry = Array.from(this.users.entries()).find(
+  ([socketId, u]) => u.username.toLowerCase() === username.toLowerCase(),
+);
+
+if (existingEntry) {
+  const [existingSocketId, existingUser] = existingEntry;
+  
+  if (existingSocketId === client.id) {
+    // Same socket reconnecting
+    this.logger.log(`User ${username} reconnecting with same socket ID`);
+  } else {
+    // Disconnect old session, allow new one
+    this.logger.log(`User ${username} connecting from new session, disconnecting old session`);
+    const oldSocket = this.server.sockets.sockets.get(existingSocketId);
+    if (oldSocket) {
+      oldSocket.emit('error', { message: 'You have been logged in from another location' });
+      oldSocket.disconnect(true);
+    }
+    this.users.delete(existingSocketId);
+  }
+}
+```
+
+### Frontend: Better Error Handling
+**File**: `frontend/src/hooks/useSocket.ts`
+
+Improved error handling to not logout on "username already taken" since backend now handles it:
+
+```typescript
+if (response.success) {
+  console.log('✅ Registration successful');
+  dispatch(setRegistered(true));
+} else {
+  console.error('❌ Registration failed:', response.message);
+  // Only logout if it's not a "username already taken" error
+  if (response.message !== 'Username already taken') {
+    dispatch(setLoginError(response.message || 'Registration failed'));
+    dispatch(logout());
+    newSocket.close();
+  }
+}
+```
+
 ## Files Changed
 - ✅ `frontend/src/store/slices/socketSlice.ts` - Added registration state
-- ✅ `frontend/src/hooks/useSocket.ts` - Set registration flag on success
+- ✅ `frontend/src/hooks/useSocket.ts` - Set registration flag on success, improved error handling
 - ✅ `frontend/src/App.tsx` - Wait for registration before admin actions
+- ✅ `backend/src/app.gateway.ts` - Handle duplicate sessions by disconnecting old one
 
 ## How It Works Now
 

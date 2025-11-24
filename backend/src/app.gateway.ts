@@ -12,6 +12,7 @@ import { Logger, Injectable } from '@nestjs/common';
 import { Socket, Server } from 'socket.io';
 import { MessageService } from './database/message.service';
 import { InvitationService } from './database/invitation.service';
+import { UserService } from './database/user.service';
 
 interface UserData {
   username: string;
@@ -34,16 +35,19 @@ export class AppGateway
   constructor(
     private readonly messageService: MessageService,
     private readonly invitationService: InvitationService,
+    private readonly userService: UserService,
   ) {}
 
-  @SubscribeMessage('register')
-  handleRegister(
+  @SubscribeMessage('registerUser')
+  async handleRegisterUser(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { username: string },
-  ): { success: boolean; message?: string } {
-    const username = data.username.trim();
+    @MessageBody() data: { username: string; email: string; password: string },
+  ): Promise<{ success: boolean; message?: string }> {
+    const username = data.username?.trim();
+    const email = data.email?.trim();
+    const password = data.password;
 
-    // Validate username
+    // Validate inputs
     if (!username || username.length < 2) {
       return {
         success: false,
@@ -51,25 +55,120 @@ export class AppGateway
       };
     }
 
-    // Check if username is already taken
-    const existingUser = Array.from(this.users.values()).find(
-      (u) => u.username.toLowerCase() === username.toLowerCase(),
-    );
-
-    if (existingUser) {
-      return { success: false, message: 'Username already taken' };
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return {
+        success: false,
+        message: 'Valid email is required',
+      };
     }
 
-    // Register user
+    if (!password || password.length < 6) {
+      return {
+        success: false,
+        message: 'Password must be at least 6 characters',
+      };
+    }
+
+    try {
+      // Create user in database
+      await this.userService.createUser({ username, email, password });
+
+      // Connect the socket session
+      this.connectUserSession(client, username);
+
+      return { success: true };
+    } catch (error) {
+      this.logger.error(`Registration failed: ${error.message}`);
+      return {
+        success: false,
+        message: error.message || 'Registration failed',
+      };
+    }
+  }
+
+  @SubscribeMessage('loginUser')
+  async handleLoginUser(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { username: string; password: string },
+  ): Promise<{ success: boolean; message?: string }> {
+    const username = data.username?.trim();
+    const password = data.password;
+
+    // Validate inputs
+    if (!username || !password) {
+      return {
+        success: false,
+        message: 'Username and password are required',
+      };
+    }
+
+    // Find user in database
+    const user = this.userService.findByUsername(username);
+    if (!user) {
+      return {
+        success: false,
+        message: 'Invalid username or password',
+      };
+    }
+
+    // Validate password
+    const isPasswordValid = await this.userService.validatePassword(
+      password,
+      user.password,
+    );
+    if (!isPasswordValid) {
+      return {
+        success: false,
+        message: 'Invalid username or password',
+      };
+    }
+
+    // Update last login
+    this.userService.updateLastLogin(user.id);
+
+    // Connect the socket session
+    this.connectUserSession(client, username);
+
+    return { success: true };
+  }
+
+  private connectUserSession(client: Socket, username: string): void {
+    // Check if username is already connected
+    const existingEntry = Array.from(this.users.entries()).find(
+      ([socketId, u]) => u.username.toLowerCase() === username.toLowerCase(),
+    );
+
+    if (existingEntry) {
+      const [existingSocketId] = existingEntry;
+
+      // If it's the same socket reconnecting, allow it
+      if (existingSocketId === client.id) {
+        this.logger.log(`User ${username} reconnecting with same socket ID`);
+      } else {
+        // Disconnect the old session and allow the new one
+        this.logger.log(
+          `User ${username} connecting from new session, disconnecting old session`,
+        );
+        const oldSocket = this.server.sockets.sockets.get(existingSocketId);
+        if (oldSocket) {
+          oldSocket.emit('error', {
+            message: 'You have been logged in from another location',
+          });
+          oldSocket.disconnect(true);
+        }
+        this.users.delete(existingSocketId);
+      }
+    }
+
+    // Register socket session
     this.users.set(client.id, {
       username,
       connectedAt: new Date(),
     });
 
-    this.logger.log(`User registered: ${username} (${client.id})`);
+    this.logger.log(`User connected: ${username} (${client.id})`);
 
     // Notify everyone
-    this.logger.log(`Notifying everyone that user joined: ${username}`);
     this.server.emit('userJoined', { username, userCount: this.users.size });
 
     // Broadcast updated user list
@@ -77,8 +176,6 @@ export class AppGateway
 
     // Send persisted messages to the user
     this.sendPersistedMessages(client, username);
-
-    return { success: true };
   }
 
   private broadcastUserList() {
@@ -95,6 +192,10 @@ export class AppGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { to: string; message: string },
   ): void {
+    this.logger.log(
+      `Private message: ${data.message} to ${data.to} from ${client.id}`,
+    );
+
     const sender = this.users.get(client.id);
     const recipientSocketId = data.to;
     const recipient = this.users.get(recipientSocketId);
@@ -105,6 +206,7 @@ export class AppGateway
     }
 
     if (!recipient) {
+      this.logger.log(`Recipient not found: ${data.to}`);
       client.emit('error', { message: 'User not found or disconnected' });
       return;
     }
@@ -280,8 +382,15 @@ export class AppGateway
     const messages = this.messageService.getMessagesForUser(username);
 
     if (messages.length > 0) {
+      const messagePreview = messages.map(m => `${m.sender}->${m.recipient}: "${m.message}"`).join(', ');
       this.logger.log(
-        `Sending ${messages.length} persisted messages to ${username}`,
+        `Sending ${messages.length} persisted messages to ${username}: [${messagePreview}]`,
+      );
+
+      // Debug: Show all messages
+      this.logger.debug(
+        `Full messages for ${username}:`,
+        JSON.stringify(messages, null, 2),
       );
 
       // Group messages by conversation partner
@@ -293,14 +402,21 @@ export class AppGateway
           conversations.set(partner, []);
         }
 
-        conversations.get(partner)!.push({
+        const messageData = {
           sender: msg.sender,
           recipient: msg.recipient,
           message: msg.message,
           timestamp: msg.timestamp.toISOString(),
           isPrivate: msg.isPrivate,
           messageId: msg.id,
-        });
+        };
+
+        conversations.get(partner)!.push(messageData);
+
+        // Log message content for debugging
+        this.logger.log(
+          `Message: ${msg.sender} -> ${msg.recipient}: "${msg.message}"`,
+        );
       });
 
       // Send all messages to client

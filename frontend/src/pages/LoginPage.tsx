@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { login, clearLoginError } from '../store/slices/authSlice';
 import { loadPersistedUsers } from '../store/slices/usersSlice';
-import { loadUsersFromStorage } from '../utils/storage';
+import { loadUsersFromStorage, saveAccessToken } from '../utils/storage';
 import { CssBaseline } from '@mui/material';
 import Login from '../components/Login';
 
@@ -23,15 +23,18 @@ function LoginPage() {
     }
   }, [isLoggedIn, isAdmin, navigate]);
 
-  const handleLogin = (name: string) => {
-    dispatch(login(name));
+  const handleLogin = (username: string, email: string, password: string, isRegistering: boolean, token: string) => {
+    // Save the access token
+    saveAccessToken(token);
+    
+    dispatch(login({ username, email, password, isRegistering }));
     dispatch(clearLoginError());
     
     // Load persisted users for this username
-    const persistedUsers = loadUsersFromStorage(name);
+    const persistedUsers = loadUsersFromStorage(username);
     
     if (persistedUsers.length > 0) {
-      console.log(`📦 Loading ${persistedUsers.length} user contact(s) for ${name}`);
+      console.log(`📦 Loading ${persistedUsers.length} user contact(s) for ${username}`);
       dispatch(loadPersistedUsers(persistedUsers));
     }
   };

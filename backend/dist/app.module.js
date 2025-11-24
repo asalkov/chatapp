@@ -12,14 +12,17 @@ const app_controller_1 = require("./app.controller");
 const app_service_1 = require("./app.service");
 const app_gateway_1 = require("./app.gateway");
 const message_service_1 = require("./database/message.service");
+const invitation_service_1 = require("./database/invitation.service");
+const invitation_controller_1 = require("./invitation.controller");
+const auth_module_1 = require("./auth/auth.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
 exports.AppModule = AppModule = __decorate([
     (0, common_1.Module)({
-        imports: [],
-        controllers: [app_controller_1.AppController],
-        providers: [app_service_1.AppService, app_gateway_1.AppGateway, message_service_1.MessageService],
+        imports: [auth_module_1.AuthModule],
+        controllers: [app_controller_1.AppController, invitation_controller_1.InvitationController],
+        providers: [app_service_1.AppService, app_gateway_1.AppGateway, message_service_1.MessageService, invitation_service_1.InvitationService],
     })
 ], AppModule);
 //# sourceMappingURL=app.module.js.map

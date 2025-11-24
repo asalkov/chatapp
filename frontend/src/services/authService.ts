@@ -1,5 +1,21 @@
-const API_URL = import.meta.env.VITE_BACKEND_URL || 
-  (window.location.hostname === 'localhost' ? 'http://localhost:3000' : `${window.location.protocol}//${window.location.hostname}:3000`);
+import { clearAllStorage } from '../utils/storage';
+
+// Construct backend URL with fallback logic
+const getApiUrl = () => {
+  if (import.meta.env.VITE_BACKEND_URL) {
+    return import.meta.env.VITE_BACKEND_URL;
+  }
+  
+  // Default to localhost for development
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    return 'http://localhost:3000';
+  }
+  
+  // For production, use same host with port 3000
+  return `${window.location.protocol}//${window.location.hostname}:3000`;
+};
+
+const API_URL = getApiUrl();
 
 export interface RegisterData {
   username: string;
@@ -71,6 +87,32 @@ export const authService = {
   },
 
   logout() {
-    // No localStorage cleanup needed
+    // Clear all localStorage data
+    clearAllStorage();
+  },
+
+  async validateToken(token: string): Promise<AuthResponse> {
+    try {
+      const response = await fetch(`${API_URL}/auth/validate`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || 'Token validation failed');
+      }
+
+      return {
+        success: result.success,
+        user: result.user,
+      };
+    } catch (error) {
+      console.error('Token validation error:', error);
+      throw error;
+    }
   },
 };
